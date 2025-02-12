@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'main.dart';
-import 'dart:convert'; // Lai varētu izmantot jsonDecode
+import 'dart:convert'; 
 
 
 class VerificationScreen extends StatefulWidget {
   final String phone;
+  final String countryCode;
 
-  VerificationScreen({required this.phone});
+  VerificationScreen({required this.countryCode, required this.phone});
 
   @override
   _VerificationScreenState createState() => _VerificationScreenState();
@@ -25,7 +26,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
     final response = await http.post(
       Uri.parse('https://droniem.lv/mtlqr/verify.php'),
-      body: {'phone': widget.phone, 'code': _codeController.text},
+      body: {'country_code': widget.countryCode, 'phone': widget.phone, 'auth_code': _codeController.text},
     );
 
 
@@ -34,12 +35,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
     });
 
     if (response.statusCode == 200) {
-      var data = jsonDecode(response.body); 
-      if (data['status'] == 'success') {
+      var userData = jsonDecode(response.body); 
+      if (userData['status'] == 'success') {
         SharedPreferences prefs = await SharedPreferences.getInstance();
 
-        bool isAdmin = (data['status_id'] != null && int.tryParse(data['status_id'].toString()) == 2);
-        String userUID = data['uid'].toString();
+        bool isAdmin = (userData['status_id'] != null && int.tryParse(userData['status_id'].toString()) == 2);
+        String userUID = userData['uid'].toString();
 
         await prefs.setBool('isLoggedIn', true);
         await prefs.setBool('isAdmin', isAdmin);
@@ -47,11 +48,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
         Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => MyHomePage(title: 'MTL')),
+        MaterialPageRoute(builder: (context) => MyHomePage(title: 'MTL', isAdmin: isAdmin)),
       );
 
       }else {
-      print('Error: ${data['error']}');
+      print('Error: ${userData['error']}');
     }
 
     } else {

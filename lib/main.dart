@@ -3,20 +3,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'account.dart';
 import 'qr_scanner.dart';
 import 'login.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'taken.dart';
+import 'reservation.dart';
+import 'users.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SharedPreferences prefs = await SharedPreferences.getInstance();
   bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+  bool isAdmin = prefs.getBool('isAdmin') ?? false;
 
-  runApp(MyApp(isLoggedIn: isLoggedIn));
+runApp(MyApp(isLoggedIn: isLoggedIn, isAdmin: isAdmin));
 }
 
 class MyApp extends StatelessWidget {
   final bool isLoggedIn;
-  const MyApp({super.key, required this.isLoggedIn});
+  final bool isAdmin;
+  const MyApp({super.key, required this.isLoggedIn, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
@@ -26,63 +29,34 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightGreen),
         useMaterial3: true,
       ),
-      home: isLoggedIn ? const MyHomePage(title: 'MTL') : LoginScreen(),
+      home: isLoggedIn ? MyHomePage(title: 'MTL', isAdmin: isAdmin) : LoginScreen(),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
   final String title;
+  final bool isAdmin;
+  const MyHomePage({super.key, required this.title, required this.isAdmin});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateMixin {
-  List<Map<String, dynamic>> _data = [];
-  List<Map<String, dynamic>> _users = [];
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    fetchData();
-    fetchUsers();
-    _tabController = TabController(length: 3, vsync: this);
-
-    _tabController.addListener(() {
-      setState(() {});
-    });
-  }
-
-  Future<void> fetchData() async {
-    final response = await http.get(Uri.parse('https://droniem.lv/mtlqr/get_items.php'));
-    if (response.statusCode == 200) {
-      final List<dynamic> responseData = json.decode(response.body);
-      setState(() {
-        _data = List<Map<String, dynamic>>.from(responseData);
-      });
-    } else {
-      throw Exception('Neizdevās iegūt datus');
-    }
-  }
-
-  Future<void> fetchUsers() async {
-    final response = await http.get(Uri.parse('https://droniem.lv/mtlqr/get_users.php'));
-    if (response.statusCode == 200) {
-      final List<dynamic> responseData = json.decode(response.body);
-      setState(() {
-        _users = List<Map<String, dynamic>>.from(responseData);
-      });
-    } else {
-      throw Exception('Neizdevās iegūt lietotāju sarakstu');
-    }
+    // Ja lietotājs nav administrators, izņemam 3. tab (Lietotāji)
+    _tabController = TabController(length: widget.isAdmin ? 3 : 2, vsync: this);
   }
 
   Future<void> logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', false);
+    await prefs.setBool('isAdmin', false);
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => LoginScreen()),
@@ -112,7 +86,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
         ],
       ),
       body: DefaultTabController(
-        length: 3,
+        length: widget.isAdmin ? 3 : 2, // Ja nav admins, tab garums ir 2
         child: Column(
           children: [
             TabBar(
@@ -120,18 +94,18 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
               labelColor: Colors.blue,
               unselectedLabelColor: Colors.grey,
               tabs: [
-                Tab(text: 'Lietošanā'),
-                Tab(text: 'Noliktava'),
-                Tab(text: 'Lietotāji'),
+                const Tab(text: 'Lietošanā'),
+                const Tab(text: 'Noliktava'),
+                if (widget.isAdmin) const Tab(text: 'Lietotāji'), // "Lietotāji" tikai adminiem
               ],
             ),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildTable(includeDate: false),
-                  _buildTable(includeDate: true),
-                  _buildUserTable(),
+                  Taken(),
+                  Reservation(),
+                  if (widget.isAdmin) Users(), // "Lietotāji" tikai adminiem
                 ],
               ),
             ),
@@ -150,48 +124,6 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
               child: const Icon(Icons.qr_code_scanner),
             )
           : null,
-    );
-  }
-
-  Widget _buildTable({required bool includeDate}) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: [
-          const DataColumn(label: Text('Kods')),
-          const DataColumn(label: Text('Veids')),
-          const DataColumn(label: Text('Statuss')),
-          if (includeDate) const DataColumn(label: Text('Datums')),
-        ],
-        rows: _data.map((item) {
-          return DataRow(cells: [
-            DataCell(Text(item['code'] ?? 'Nav')),
-            DataCell(Text(item['type'] ?? 'Nav')),
-            DataCell(Text(item['status_id'] ?? 'Nav')),
-            if (includeDate) DataCell(Text(item['date'] ?? 'Nav')),
-          ]);
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildUserTable() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: [
-          const DataColumn(label: Text('ID')),
-          const DataColumn(label: Text('Vārds')),
-          const DataColumn(label: Text('Telefons')),
-        ],
-        rows: _users.map((user) {
-          return DataRow(cells: [
-            DataCell(Text(user['id'].toString() ?? 'Nav')),
-            DataCell(Text(user['name'] ?? 'Nav')),
-            DataCell(Text(user['phone'] ?? 'Nav')),
-          ]);
-        }).toList(),
-      ),
     );
   }
 }

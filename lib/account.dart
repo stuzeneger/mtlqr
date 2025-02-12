@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MyAccountScreen extends StatefulWidget {
   @override
@@ -8,7 +9,7 @@ class MyAccountScreen extends StatefulWidget {
 }
 
 class _MyAccountScreenState extends State<MyAccountScreen> {
-  Map<String, dynamic>? userData; // Lietotāja dati
+  Map<String, dynamic>? userData; 
 
   @override
   void initState() {
@@ -17,11 +18,22 @@ class _MyAccountScreenState extends State<MyAccountScreen> {
   }
 
   Future<void> fetchUserData() async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://droniem.lv/mtlqr/get_user.php?uid=fd508503-cc0b-4c43-8eaf-56c0bcbbd170'), // Maini URL!
-      );
+    try {   
+      
 
+
+     SharedPreferences prefs = await SharedPreferences.getInstance();
+      String userUID = prefs.getString('userUID') ?? '';
+print(userUID);
+
+      final response = await http.get(
+        Uri.parse('https://droniem.lv/mtlqr/get_user.php')
+            .replace(queryParameters: {
+          'uid': userUID,
+        }),
+      );
+ 
+print(response);
       if (response.statusCode == 200) {
         setState(() {
           userData = json.decode(response.body);
@@ -48,7 +60,9 @@ class _MyAccountScreenState extends State<MyAccountScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("Vārds: ${userData!['name']}", style: TextStyle(fontSize: 20)),
-                  Text("Telefons: ${userData!['phone']}", style: TextStyle(fontSize: 18)),
+                  Text("Tālrunis: +${userData!['phone']}", style: TextStyle(fontSize: 18)),
+                  Text("Statuss: ${userData!['status']}", style: TextStyle(fontSize: 18)),
+                  Text("Reģistrēts: ${userData!['registered']}", style: TextStyle(fontSize: 18)),
                 ],
               ),
             ),

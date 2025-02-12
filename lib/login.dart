@@ -16,19 +16,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final List<String> countryCodes = ["+371", "+370", "+372", "+49", "+44", "+1"]; // Pievieno vajadzīgos kodus
 
   Future<void> sendPhoneNumber() async {
-
-    String phoneNumber =
-        (_selectedCountryCode + _phoneController.text).replaceFirst('+', '');
+    String countryCode = _selectedCountryCode.replaceFirst('+', '');
+    String phoneNumber = _phoneController.text;
+      
 
     setState(() {
       _loading = true;
     });
 
-print('Sūtu SMS');
+    print('Sūtu SMS');
 
     final response = await http.get(
       Uri.parse('https://droniem.lv/mtlqr/authorize.php').replace(
-        queryParameters: {'phone': phoneNumber},
+        queryParameters: {'country_code': countryCode, 'phone': phoneNumber},
       ),
     );
 
@@ -36,11 +36,13 @@ print('Sūtu SMS');
       _loading = false;
     });
 
+print(response.body);
+
     if (response.statusCode == 200) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => VerificationScreen(phone: phoneNumber),
+          builder: (context) => VerificationScreen(countryCode: countryCode, phone: phoneNumber),
         ),
       );
     } else {
