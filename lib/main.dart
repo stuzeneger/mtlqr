@@ -13,7 +13,9 @@ void main() async {
   bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
   bool isAdmin = prefs.getBool('isAdmin') ?? false;
 
-runApp(MyApp(isLoggedIn: isLoggedIn, isAdmin: isAdmin));
+  print('Is Admin: $isAdmin');
+
+  runApp(MyApp(isLoggedIn: isLoggedIn, isAdmin: isAdmin));
 }
 
 class MyApp extends StatelessWidget {
@@ -25,6 +27,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MTLQR menedžeris',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightGreen),
         useMaterial3: true,
@@ -49,8 +52,10 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    // Ja lietotājs nav administrators, izņemam 3. tab (Lietotāji)
     _tabController = TabController(length: widget.isAdmin ? 3 : 2, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // Lai FloatingActionButton pareizi atjaunotos
+    });
   }
 
   Future<void> logout() async {
@@ -61,6 +66,12 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       context,
       MaterialPageRoute(builder: (context) => LoginScreen()),
     );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -85,32 +96,29 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
           ),
         ],
       ),
-      body: DefaultTabController(
-        length: widget.isAdmin ? 3 : 2, // Ja nav admins, tab garums ir 2
-        child: Column(
-          children: [
-            TabBar(
+      body: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            labelColor: Colors.blue,
+            unselectedLabelColor: Colors.grey,
+            tabs: [
+              const Tab(text: 'Lietošanā'),
+              const Tab(text: 'Noliktava'),
+              if (widget.isAdmin) const Tab(text: 'Lietotāji'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
               controller: _tabController,
-              labelColor: Colors.blue,
-              unselectedLabelColor: Colors.grey,
-              tabs: [
-                const Tab(text: 'Lietošanā'),
-                const Tab(text: 'Noliktava'),
-                if (widget.isAdmin) const Tab(text: 'Lietotāji'), // "Lietotāji" tikai adminiem
+              children: [
+                Taken(),
+                Reservation(),
+                if (widget.isAdmin) Users(),
               ],
             ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  Taken(),
-                  Reservation(),
-                  if (widget.isAdmin) Users(), // "Lietotāji" tikai adminiem
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       floatingActionButton: _tabController.index == 0
           ? FloatingActionButton(

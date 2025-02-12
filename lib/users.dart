@@ -13,7 +13,7 @@ class Users extends StatefulWidget {
 class _UsersState extends State<Users> {
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _filteredUsers = [];
-  bool isLargeScreen = false;
+  bool showBlockedUsers = false;
   TextEditingController _searchController = TextEditingController();
 
   @override
@@ -30,7 +30,7 @@ class _UsersState extends State<Users> {
         final List<dynamic> responseData = json.decode(response.body);
         setState(() {
           _users = List<Map<String, dynamic>>.from(responseData);
-          _filteredUsers = List<Map<String, dynamic>>.from(responseData); // Inicializējam filtrētos datus
+          _filterUsers();
         });
       } else {
         throw Exception('Neizdevās iegūt lietotāju sarakstu');
@@ -44,66 +44,19 @@ class _UsersState extends State<Users> {
     String query = _searchController.text.toLowerCase();
     setState(() {
       _filteredUsers = _users.where((user) {
-        return user['name']?.toLowerCase().contains(query) ?? false || 
-               user['phone']?.toLowerCase().contains(query) ?? false;
+        bool matchesSearch = user['name']?.toLowerCase().contains(query) ?? false ||
+                             user['phone']?.toLowerCase().contains(query) ?? false;
+        bool matchesFilter = showBlockedUsers || user['status_id'] != '3';
+        return matchesSearch && matchesFilter;
       }).toList();
     });
   }
 
-  void _addUser(Map<String, dynamic> newUser) {
+  void _toggleShowBlockedUsers(bool value) {
     setState(() {
-      _users.add(newUser);
-      _filteredUsers.add(newUser);
+      showBlockedUsers = value;
+      _filterUsers();
     });
-  }
-
-  void _editUser(Map<String, dynamic> updatedUser, int index) {
-    setState(() {
-      _users[index] = updatedUser;
-      _filteredUsers[index] = updatedUser;
-    });
-  }
-
-  Color _getRowColor(String? statusId) {
-    switch (statusId) {
-      case '0':
-        return Colors.yellow.withOpacity(0.3);
-      case '2':
-        return Colors.green.withOpacity(0.3);
-      case '3':
-        return Colors.red.withOpacity(0.3);
-      default:
-        return Colors.transparent;
-    }
-  }
-
-  void _showBlockUserDialog(Map<String, dynamic> user, int index) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Bloķēt lietotāju'),
-          content: const Text('Vai tiešām vēlaties šo lietotāju bloķēt?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Atcelt'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  user['status_id'] = '3'; // Iestata statusu uz "Bloķēts"
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('Bloķēt'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
@@ -114,9 +67,41 @@ class _UsersState extends State<Users> {
 
   @override
   Widget build(BuildContext context) {
+    bool isLargeScreen = MediaQuery.of(context).size.width > 600;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Lietotāji'),
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 40,
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Meklēt...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Switch(
+              value: showBlockedUsers,
+              onChanged: _toggleShowBlockedUsers,
+              activeColor: Colors.red,
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -128,183 +113,98 @@ class _UsersState extends State<Users> {
               showDialog(
                 context: context,
                 builder: (BuildContext context) {
-                  return UserFormDialog(
-                    onSubmit: _addUser,
-                  );
+                  return UserFormDialog(onSubmit: (newUser) {
+                    setState(() {
+                      _users.add(newUser);
+                      _filterUsers();
+                    });
+                  });
                 },
               );
             },
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          // Atjaunojam ekrāna izmēra pārbaudi, lai pareizi noteiktu lielo ekrānu
-          isLargeScreen = constraints.maxWidth > 600;
-
-          return SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: double.infinity), // Tabula aizņem visu platumu
-              child: Column(
-                children: [
-                  // Meklēšanas lauks
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        labelText: 'Meklēt pēc vārda vai telefona',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.search),
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: DataTable(
+            columns: [
+              const DataColumn(label: Text('Lietotājs')),
+              if (isLargeScreen) const DataColumn(label: Text('Statuss')),
+              if (isLargeScreen) const DataColumn(label: Text('Tālrunis')),
+              const DataColumn(label: Text('Darbības')),
+            ],
+            rows: _filteredUsers.map((user) {
+              return DataRow(
+                cells: [
+                  DataCell(Text(user['name'] ?? 'Nav')),
+                  if (isLargeScreen) DataCell(Text(user['status'] ?? 'Nav')),
+                  if (isLargeScreen)
+                    DataCell(Text('+${user['phone_country_code'] ?? ''}${user['phone'] ?? 'Nav'}')),
+                  DataCell(Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return UserFormDialog(
+                                user: user,
+                                onSubmit: (updatedUser) {
+                                  setState(() {
+                                    int index = _users.indexWhere((u) => u['id'] == updatedUser['id']);
+                                    if (index != -1) {
+                                      _users[index] = updatedUser;
+                                      _filterUsers();
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          );
+                        },
                       ),
-                    ),
-                  ),
-                  // Lietotāju tabula
-                  DataTable(
-                    columns: [
-                      const DataColumn(label: Text('Lietotājs')),
-                      if (isLargeScreen) const DataColumn(label: Text('Statuss')), // Paslēpj "Statuss" šaurākos ekrānos
-                      if (isLargeScreen) const DataColumn(label: Text('Tālrunis')), // Paslēpj "Tālrunis" šaurākos ekrānos
-                      const DataColumn(label: Text('Darbības')), // "Darbības" vienmēr būs redzama
-                    ],
-                    rows: _filteredUsers.map((user) {
-                      int index = _filteredUsers.indexOf(user);
-                      bool isBlocked = user['status_id'] == '3'; // Pārbaude, vai lietotājs ir bloķēts
-
-                      return DataRow(
-                        color: MaterialStateProperty.all(_getRowColor(user['status_id']?.toString())),
-                        cells: [
-                          DataCell(Text(user['name'] ?? 'Nav')),
-                          if (isLargeScreen) DataCell(Text(user['status'] ?? 'Nav')), // Paslēpj "Statuss" šaurākos ekrānos
-                          if (isLargeScreen) DataCell(Text('+${user['county_code'] ?? ''}${user['phone'] ?? 'Nav'}')), // Paslēpj "Tālrunis" šaurākos ekrānos
-                          DataCell(
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (BuildContext context) {
-                                        return EditUserDialog(
-                                          user: user,
-                                          onSubmit: (updatedUser) {
-                                            _editUser(updatedUser, index);
-                                          },
-                                        );
+                      if (user['status_id'] != '3')
+                        IconButton(
+                          icon: const Icon(Icons.lock),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title: const Text('Bloķēt lietotāju'),
+                                  content: const Text('Vai tiešām vēlaties šo lietotāju bloķēt?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(),
+                                      child: const Text('Atcelt'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          user['status_id'] = '3';
+                                        });
+                                        Navigator.of(context).pop();
                                       },
-                                    );
-                                  },
-                                ),
-                                if (!isBlocked)
-                                  IconButton(
-                                    icon: const Icon(Icons.lock),
-                                    onPressed: () {
-                                      _showBlockUserDialog(user, index);
-                                    },
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
+                                      child: const Text('Bloķēt'),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
+                        ),
+                    ],
+                  )),
                 ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class EditUserDialog extends StatefulWidget {
-  final Map<String, dynamic> user;
-  final Function(Map<String, dynamic>) onSubmit;
-
-  const EditUserDialog({Key? key, required this.user, required this.onSubmit}) : super(key: key);
-
-  @override
-  _EditUserDialogState createState() => _EditUserDialogState();
-}
-
-class _EditUserDialogState extends State<EditUserDialog> {
-  late TextEditingController _nameController;
-  late TextEditingController _phoneController;
-  late String _selectedStatus;
-
-  final Map<String, String> statusOptions = {
-    '1': 'Lietotājs',
-    '2': 'Administrātors',
-    '3': 'Bloķēts',
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.user['name']);
-    _phoneController = TextEditingController(text: widget.user['phone']);
-    _selectedStatus = widget.user['status_id']?.toString() ?? '1';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Rediģēt lietotāju'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Vārds'),
-          ),
-          TextField(
-            controller: _phoneController,
-            decoration: const InputDecoration(labelText: 'Telefons'),
-            keyboardType: TextInputType.phone,
-          ),
-          DropdownButtonFormField<String>( 
-            value: _selectedStatus,
-            decoration: const InputDecoration(labelText: 'Statuss'),
-            items: statusOptions.entries.map((entry) {
-              return DropdownMenuItem<String>(
-                value: entry.key,
-                child: Text(entry.value),
               );
             }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedStatus = newValue;
-                });
-              }
-            },
           ),
-        ],
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          child: const Text('Atcelt'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final updatedUser = {
-              'name': _nameController.text,
-              'phone': _phoneController.text,
-              'status_id': _selectedStatus,
-            };
-            widget.onSubmit(updatedUser);
-            Navigator.of(context).pop();
-          },
-          child: const Text('Saglabāt'),
-        ),
-      ],
     );
   }
 }
