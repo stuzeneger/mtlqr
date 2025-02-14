@@ -6,6 +6,7 @@ import 'login.dart';
 import 'taken.dart';
 import 'reservation.dart';
 import 'users.dart';
+import 'warehouse.dart'; // Jauns imports, lai pievienotu jauno "Items" ekrānu
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,7 +53,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: widget.isAdmin ? 3 : 2, vsync: this);
+    _tabController = TabController(length: widget.isAdmin ? 4 : 3, vsync: this); // Mainīgs garums
     _tabController.addListener(() {
       setState(() {}); // Lai FloatingActionButton pareizi atjaunotos
     });
@@ -104,8 +105,9 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
             unselectedLabelColor: Colors.grey,
             tabs: [
               const Tab(text: 'Lietošanā'),
-              const Tab(text: 'Noliktava'),
+              const Tab(text: 'Rezervāčija'),
               if (widget.isAdmin) const Tab(text: 'Lietotāji'),
+              if (widget.isAdmin) const Tab(text: 'Noliktava'), // Jauna sadaļa
             ],
           ),
           Expanded(
@@ -115,6 +117,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                 Taken(),
                 Reservation(),
                 if (widget.isAdmin) Users(),
+                if (widget.isAdmin) Warehouse(), // Jauna sadaļa
               ],
             ),
           ),

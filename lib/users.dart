@@ -25,7 +25,7 @@ class _UsersState extends State<Users> {
 
   Future<void> fetchUsers() async {
     try {
-      final response = await http.get(Uri.parse('https://droniem.lv/mtlqr/get_users.php'));
+      final response = await http.get(Uri.parse('https://droniem.lv/mtlqr/users.php'));
       if (response.statusCode == 200) {
         final List<dynamic> responseData = json.decode(response.body);
         setState(() {
@@ -44,12 +44,19 @@ class _UsersState extends State<Users> {
     String query = _searchController.text.toLowerCase();
     setState(() {
       _filteredUsers = _users.where((user) {
-        bool matchesSearch = user['name']?.toLowerCase().contains(query) ?? false ||
-                             user['phone']?.toLowerCase().contains(query) ?? false;
+        bool matchesSearch = (user['name']?.toLowerCase().contains(query) ?? false) ||
+                             (user['phone']?.toLowerCase().contains(query) ?? false);
         bool matchesFilter = showBlockedUsers || user['status_id'] != '3';
         return matchesSearch && matchesFilter;
       }).toList();
     });
+  }
+
+  String formatPhoneNumber(String? countryCode, String? phoneNumber) {
+    if (countryCode == null || countryCode.isEmpty || phoneNumber == null || phoneNumber.isEmpty) {
+      return 'Nav';
+    }
+    return '+$countryCode$phoneNumber';
   }
 
   void _toggleShowBlockedUsers(bool value) {
@@ -57,6 +64,19 @@ class _UsersState extends State<Users> {
       showBlockedUsers = value;
       _filterUsers();
     });
+  }
+
+  Color getStatusColor(String statusId) {
+    switch (statusId) {
+      case '1':
+        return Colors.green;
+      case '2':
+        return Colors.blue;
+      case '3':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
@@ -140,9 +160,15 @@ class _UsersState extends State<Users> {
               return DataRow(
                 cells: [
                   DataCell(Text(user['name'] ?? 'Nav')),
-                  if (isLargeScreen) DataCell(Text(user['status'] ?? 'Nav')),
                   if (isLargeScreen)
-                    DataCell(Text('+${user['phone_country_code'] ?? ''}${user['phone'] ?? 'Nav'}')),
+                    DataCell(
+                      Text(
+                        user['status'] ?? 'Nav',
+                        style: TextStyle(color: getStatusColor(user['status_id'].toString())),
+                      ),
+                    ),
+                  if (isLargeScreen)
+                    DataCell(Text(formatPhoneNumber(user['country_code'], user['phone']))),
                   DataCell(Row(
                     children: [
                       IconButton(

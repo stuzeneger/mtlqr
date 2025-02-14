@@ -22,9 +22,8 @@ class _MyAccountScreenState extends State<MyAccountScreen> {
       
 
 
-     SharedPreferences prefs = await SharedPreferences.getInstance();
+      SharedPreferences prefs = await SharedPreferences.getInstance();
       String userUID = prefs.getString('userUID') ?? '';
-print(userUID);
 
       final response = await http.get(
         Uri.parse('https://droniem.lv/mtlqr/get_user.php')
