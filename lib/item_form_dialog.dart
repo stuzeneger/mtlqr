@@ -62,6 +62,8 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       body: jsonEncode(newItem),
     );
 
+      print('Response Body: ${response.body}');
+
     if (response.statusCode == 200) {
       widget.onSubmit(newItem);
       Navigator.of(context).pop();

@@ -18,9 +18,7 @@ class _MyAccountScreenState extends State<MyAccountScreen> {
   }
 
   Future<void> fetchUserData() async {
-    try {   
-      
-
+    try {       
 
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String userUID = prefs.getString('userUID') ?? '';

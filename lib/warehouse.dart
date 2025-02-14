@@ -37,7 +37,7 @@ class _WarehouseState extends State<Warehouse> {
   Future<void> fetchItems() async {
     try {
       final response = await http.get(Uri.parse('https://droniem.lv/mtlqr/warehouse.php'));
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> responseData = json.decode(response.body);
         setState(() {
@@ -58,49 +58,14 @@ class _WarehouseState extends State<Warehouse> {
       _filteredItems = _items.where((item) {
         bool matchesSearch = item['code']?.toLowerCase().contains(query) ?? false;
         int? status = int.tryParse(item['status_id'].toString());
-        
+
         if (_filterStatusLostItems) {
-          return matchesSearch && (status == 4 || status == 5 || status == 6);
+          return matchesSearch && !(status == 3);
         } else {
-          return matchesSearch && !(status == 4 || status == 5 || status == 6);
+          return matchesSearch && status == 3;
         }
       }).toList();
     });
-  }
-
-  Color? getStatusColor(dynamic statusId) {
-    int id = int.tryParse(statusId.toString()) ?? 0;
-    switch (id) {
-      case 1:
-        return null;
-      case 2:
-        return Colors.yellow;
-      case 3:
-        return Colors.blue;
-      case 4:
-      case 5:
-      case 6:
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Future<void> _deleteItem(int id) async {
-    final response = await http.post(
-      Uri.parse('https://droniem.lv/mtlqr/delete_item.php'),
-      headers: {'Content-Type': 'application/json; charset=UTF-8'},
-      body: jsonEncode({'id': id}),
-    );
-
-    if (response.statusCode == 200) {
-      setState(() {
-        _items.removeWhere((item) => item['id'] == id);
-        _filterItems();
-      });
-    } else {
-      throw Exception('Neizdevās dzēst priekšmetu');
-    }
   }
 
   @override
@@ -109,24 +74,33 @@ class _WarehouseState extends State<Warehouse> {
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: Row(
           children: [
             Expanded(
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Meklēt...',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  filled: true,
-                  fillColor: Colors.white,
+              child: SizedBox(
+                height: 40,
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Meklēt...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
                 ),
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             IconButton(
               icon: Icon(
-                _filterStatusLostItems ? Icons.filter_alt : Icons.filter_alt_off,
+                _filterStatusLostItems ? Icons.filter_alt_off : Icons.filter_alt,
                 color: _filterStatusLostItems ? Colors.red : Colors.grey,
               ),
               onPressed: () {
@@ -138,28 +112,6 @@ class _WarehouseState extends State<Warehouse> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: fetchItems,
-          ),
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return ItemFormDialog(onSubmit: (newItem) {
-                    setState(() {
-                      _items.add(newItem);
-                      _filterItems();
-                    });
-                  });
-                },
-              );
-            },
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -174,9 +126,6 @@ class _WarehouseState extends State<Warehouse> {
             ],
             rows: _filteredItems.map((item) {
               return DataRow(
-                color: MaterialStateProperty.resolveWith<Color?>(
-                  (Set<MaterialState> states) => getStatusColor(item['status_id']),
-                ),
                 cells: [
                   DataCell(Text(item['code'] ?? 'Nav')),
                   if (isLargeScreen) DataCell(Text(item['qr_code'] ?? 'Nav')),
@@ -199,6 +148,7 @@ class _WarehouseState extends State<Warehouse> {
                                       _filterItems();
                                     }
                                   });
+                                  fetchItems();
                                 },
                               );
                             },

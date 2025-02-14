@@ -3,10 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'account.dart';
 import 'qr_scanner.dart';
 import 'login.dart';
-import 'taken.dart';
+import 'takens.dart';
 import 'reservation.dart';
 import 'users.dart';
-import 'warehouse.dart'; // Jauns imports, lai pievienotu jauno "Items" ekrānu
+import 'warehouse.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -106,18 +106,18 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
             tabs: [
               const Tab(text: 'Lietošanā'),
               const Tab(text: 'Rezervāčija'),
-              if (widget.isAdmin) const Tab(text: 'Lietotāji'),
               if (widget.isAdmin) const Tab(text: 'Noliktava'), // Jauna sadaļa
+              if (widget.isAdmin) const Tab(text: 'Lietotāji'),
             ],
           ),
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                Taken(),
+                Takens(),
                 Reservation(),
-                if (widget.isAdmin) Users(),
                 if (widget.isAdmin) Warehouse(), // Jauna sadaļa
+                if (widget.isAdmin) Users(),    
               ],
             ),
           ),
