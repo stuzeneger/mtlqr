@@ -42,13 +42,13 @@ class _UserFormDialogState extends State<UserFormDialog> {
     if (widget.user != null) {
       return {
         '1': 'Lietotājs',
-        '2': 'Administrātors',
+        '2': 'Pārzinis',
         '3': 'Bloķēts',
       };
     } else {
       return {
         '1': 'Lietotājs',
-        '2': 'Administrātors',
+        '2': 'Pārzinis',
       };
     }
   }

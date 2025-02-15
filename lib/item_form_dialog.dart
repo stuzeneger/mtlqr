@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ItemFormDialog extends StatefulWidget {
   final Map<String, dynamic>? item;
@@ -46,14 +47,19 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   }
 
   Future<void> _saveItem() async {
+    
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String userUID=prefs.getString('userUID') ?? '';  
+
     final Map<String, dynamic> newItem = {
+      'user_uid': userUID,
       'code': _codeController.text,
       'qr_code': _qrCodeController.text,
       'status_id': _statusId,
     };
 
     if (widget.item != null) {
-      newItem['uid'] = widget.item!['uid'];
+      newItem['item_uid'] = widget.item!['uid'];
     }
 
     final response = await http.post(
@@ -62,8 +68,9 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       body: jsonEncode(newItem),
     );
 
-      print('Response Body: ${response.body}');
+    print(response.body);
 
+  
     if (response.statusCode == 200) {
       widget.onSubmit(newItem);
       Navigator.of(context).pop();
@@ -81,11 +88,11 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
           children: [
             TextField(
               controller: _codeController,
-              decoration: const InputDecoration(labelText: 'Code'),
+              decoration: const InputDecoration(labelText: 'Kods'),
             ),
             TextField(
               controller: _qrCodeController,
-              decoration: const InputDecoration(labelText: 'QR Code'),
+              decoration: const InputDecoration(labelText: 'QR kods (6 cipari)'),
             ),
             DropdownButtonFormField<int>(
               value: _statusId,

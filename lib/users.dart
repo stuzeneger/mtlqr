@@ -15,6 +15,7 @@ class _UsersState extends State<Users> {
   List<Map<String, dynamic>> _filteredUsers = [];
   bool showBlockedUsers = false;
   TextEditingController _searchController = TextEditingController();
+  bool isLoading = false;  // Jauns mainīgais, lai uzglabātu ielādes statusu
 
   @override
   void initState() {
@@ -23,13 +24,22 @@ class _UsersState extends State<Users> {
     _searchController.addListener(_filterUsers);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    fetchUsers();
+  }
+
   Future<void> fetchUsers() async {
+    setState(() {
+      isLoading = true;  // Uzstādam ielādes statusu uz true
+    });
     try {
       final response = await http.get(Uri.parse('https://droniem.lv/mtlqr/users.php'));
       if (response.statusCode == 200) {
         final List<dynamic> responseData = json.decode(response.body);
         setState(() {
-          _users = List<Map<String, dynamic>>.from(responseData);
+          _users = List<Map<String, dynamic>>.from(responseData);          
           _filterUsers();
         });
       } else {
@@ -37,6 +47,10 @@ class _UsersState extends State<Users> {
       }
     } catch (e) {
       print('Kļūda: $e');
+    } finally {
+      setState(() {
+        isLoading = false;  // Kad dati ir iegūti vai gadījumā notikusi kļūda, ielāde ir pabeigta
+      });
     }
   }
 
@@ -45,7 +59,7 @@ class _UsersState extends State<Users> {
     setState(() {
       _filteredUsers = _users.where((user) {
         bool matchesSearch = (user['name']?.toLowerCase().contains(query) ?? false) ||
-                             (user['phone']?.toLowerCase().contains(query) ?? false);
+                             (formatPhoneNumber(user['country_code'], user['phone'])?.toLowerCase().contains(query) ?? false);
         bool matchesFilter = showBlockedUsers || user['status_id'] != '3';
         return matchesSearch && matchesFilter;
       }).toList();
@@ -147,89 +161,70 @@ class _UsersState extends State<Users> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: DataTable(
-            columns: [
-              const DataColumn(label: Text('Lietotājs')),
-              if (isLargeScreen) const DataColumn(label: Text('Statuss')),
-              if (isLargeScreen) const DataColumn(label: Text('Tālrunis')),
-              const DataColumn(label: Text('Darbības')),
-            ],
-            rows: _filteredUsers.map((user) {
-              return DataRow(
-                cells: [
-                  DataCell(Text(user['name'] ?? 'Nav')),
-                  if (isLargeScreen)
-                    DataCell(
-                      Text(
-                        user['status'] ?? 'Nav',
-                        style: TextStyle(color: getStatusColor(user['status_id'].toString())),
-                      ),
-                    ),
-                  if (isLargeScreen)
-                    DataCell(Text(formatPhoneNumber(user['country_code'], user['phone']))),
-                  DataCell(Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (BuildContext context) {
-                              return UserFormDialog(
-                                user: user,
-                                onSubmit: (updatedUser) {
-                                  setState(() {
-                                    int index = _users.indexWhere((u) => u['id'] == updatedUser['id']);
-                                    if (index != -1) {
-                                      _users[index] = updatedUser;
-                                      _filterUsers();
-                                    }
-                                  });
-                                },
-                              );
-                            },
-                          );
-                        },
-                      ),
-                      if (user['status_id'] != '3')
-                        IconButton(
-                          icon: const Icon(Icons.lock),
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return AlertDialog(
-                                  title: const Text('Bloķēt lietotāju'),
-                                  content: const Text('Vai tiešām vēlaties šo lietotāju bloķēt?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.of(context).pop(),
-                                      child: const Text('Atcelt'),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () {
+        child: isLoading
+            ? Center(child: CircularProgressIndicator()) // Parādām rimbulīti, kamēr dati tiek ielādēti
+            : SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: DataTable(
+                  columns: [
+                    const DataColumn(label: Text('Lietotājs')),
+                    if (isLargeScreen) const DataColumn(label: Text('Statuss')),
+                    if (isLargeScreen) const DataColumn(label: Text('Tālrunis')),
+                    const DataColumn(label: Text('Darbības')),
+                  ],
+                  rows: _filteredUsers.map((user) {
+                    Color rowColor = getStatusColor(user['status_id'].toString());
+
+                    return DataRow(
+                      color: MaterialStateProperty.all(rowColor.withOpacity(0.1)),  // Iekrāsojam rindu
+                      cells: [
+                        DataCell(Text(user['name'] ?? 'Nav')),
+                        if (isLargeScreen)
+                          DataCell(
+                            Text(user['status'] ?? 'Nav'),  // Noņemta krāsa no statusa
+                          ),
+                        if (isLargeScreen)
+                          DataCell(Text(formatPhoneNumber(user['country_code'], user['phone']))),
+                        DataCell(Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return UserFormDialog(
+                                      user: user,
+                                      onSubmit: (updatedUser) {
                                         setState(() {
-                                          user['status_id'] = '3';
+                                          int index = _users.indexWhere((u) => u['id'] == updatedUser['id']);
+                                          if (index != -1) {
+                                            _users[index] = updatedUser;
+                                            _filterUsers();
+                                          }
                                         });
-                                        Navigator.of(context).pop();
                                       },
-                                      child: const Text('Bloķēt'),
-                                    ),
-                                  ],
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
-                        ),
-                    ],
-                  )),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
+                            ),
+                            if (user['status_id'] != '3')
+                              IconButton(
+                                icon: const Icon(Icons.lock),
+                                onPressed: () {
+                                  setState(() {
+                                    user['status_id'] = '3';
+                                  });
+                                },
+                              ),
+                          ],
+                        )),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
       ),
     );
   }

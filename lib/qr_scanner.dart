@@ -4,7 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:geolocator/geolocator.dart'; // Importēts Geolocator pakotne
+import 'package:geolocator/geolocator.dart'; 
 
 class QRScannerScreen extends StatefulWidget {
   @override
@@ -96,7 +96,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         }),
       );
 
-  print('Response Body: ${response.body}');
+
 
 
       if (response.statusCode == 200) {

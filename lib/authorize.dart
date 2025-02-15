@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'main.dart';
-import 'dart:convert'; 
-
+import 'services/auth_service.dart';
 
 class VerificationScreen extends StatefulWidget {
   final String phone;
@@ -19,42 +19,31 @@ class _VerificationScreenState extends State<VerificationScreen> {
   final TextEditingController _codeController = TextEditingController();
   bool _loading = false;
 
+  // Funkcija, kas izsauc 'verifyCode' no PHP faila
   Future<void> verifyCode() async {
     setState(() {
       _loading = true;
     });
 
-    final response = await http.post(
-      Uri.parse('https://droniem.lv/mtlqr/verify.php'),
-      body: {'country_code': widget.countryCode, 'phone': widget.phone, 'auth_code': _codeController.text},
+    // Izsauc AuthService verifyCode metodi
+    bool success = await AuthService.verifyCode(
+      widget.countryCode, 
+      widget.phone, 
+      _codeController.text,
     );
-
 
     setState(() {
       _loading = false;
     });
 
-    if (response.statusCode == 200) {
-      var userData = jsonDecode(response.body); 
-      if (userData['status'] == 'success') {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (success) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      bool isAdmin = prefs.getBool('isAdmin') ?? false;
 
-        bool isAdmin = (userData['status_id'] != null && int.tryParse(userData['status_id'].toString()) == 2);
-        String userUID = userData['uid'].toString();
-
-        await prefs.setBool('isLoggedIn', true);
-        await prefs.setBool('isAdmin', isAdmin);
-        await prefs.setString('userUID', userUID);
-
-        Navigator.pushReplacement(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => MyHomePage(title: 'MTL', isAdmin: isAdmin)),
       );
-
-      }else {
-      print('Error: ${userData['error']}');
-    }
-
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Autorizācijas servisa kļūda!')),

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'services/auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'item_form_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Warehouse extends StatefulWidget {
   @override
@@ -12,7 +14,8 @@ class _WarehouseState extends State<Warehouse> {
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _filteredItems = [];
   TextEditingController _searchController = TextEditingController();
-  bool _filterStatusLostItems = false; // Filtra stāvoklis
+  bool _filterStatusLostItems = false;
+  bool isLoading = false;
 
   static const Map<int, String> statusMap = {
     1: 'Noliktavā',
@@ -23,32 +26,57 @@ class _WarehouseState extends State<Warehouse> {
     6: 'Norakstīts',
   };
 
-  String getStatusName(int statusId) {
+  String getStatusName(int? statusId) {
     return statusMap[statusId] ?? 'Nezināms';
   }
 
   @override
   void initState() {
     super.initState();
-    fetchItems();
     _searchController.addListener(_filterItems);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    fetchItems();
+  }
+
   Future<void> fetchItems() async {
+    setState(() {
+      isLoading = true;
+    });
     try {
-      final response = await http.get(Uri.parse('https://droniem.lv/mtlqr/warehouse.php'));
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String userUID = prefs.getString('userUID') ?? '';
+
+      final response = await http.post(
+        Uri.parse('https://droniem.lv/mtlqr/warehouse.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'user_uid': userUID}),
+      );
+      print(response.body);
 
       if (response.statusCode == 200) {
-        final List<dynamic> responseData = json.decode(response.body);
-        setState(() {
-          _items = List<Map<String, dynamic>>.from(responseData);
-          _filterItems();
-        });
+        final responseData = json.decode(response.body);
+
+        if (responseData is Map<String, dynamic> && responseData['command'] == 'logout') {
+          AuthService.logoutUser(context);
+        } else if (responseData is List) {
+          setState(() {
+            _items = List<Map<String, dynamic>>.from(responseData);
+            _filterItems();
+          });
+        }
       } else {
         throw Exception('Neizdevās iegūt priekšmetu sarakstu');
       }
     } catch (e) {
       print('Kļūda: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -57,12 +85,12 @@ class _WarehouseState extends State<Warehouse> {
     setState(() {
       _filteredItems = _items.where((item) {
         bool matchesSearch = item['code']?.toLowerCase().contains(query) ?? false;
-        int? status = int.tryParse(item['status_id'].toString());
+        int? statusId = int.tryParse(item['status_id'].toString());
 
         if (_filterStatusLostItems) {
-          return matchesSearch && !(status == 3);
+          return matchesSearch && !(statusId == 3 || statusId == 2);
         } else {
-          return matchesSearch && status == 3;
+          return matchesSearch && (statusId == 3 || statusId == 2);
         }
       }).toList();
     });
@@ -99,9 +127,12 @@ class _WarehouseState extends State<Warehouse> {
             ),
             const SizedBox(width: 8),
             IconButton(
-              icon: Icon(
-                _filterStatusLostItems ? Icons.filter_alt_off : Icons.filter_alt,
-                color: _filterStatusLostItems ? Colors.red : Colors.grey,
+              icon: Transform.rotate(
+                angle: 3.1416,
+                child: Icon(
+                  _filterStatusLostItems ? Icons.filter_alt_off : Icons.filter_alt,
+                  color: _filterStatusLostItems ? Colors.red : Colors.grey,
+                ),
               ),
               onPressed: () {
                 setState(() {
@@ -112,57 +143,86 @@ class _WarehouseState extends State<Warehouse> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: fetchItems,
+          ),
+          IconButton(
+            icon: Icon(Icons.add),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return ItemFormDialog(
+                    onSubmit: (newItem) {
+                      setState(() {
+                        _items.add(newItem);
+                        _filterItems();
+                      });
+                      fetchItems();
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: DataTable(
-            columns: [
-              const DataColumn(label: Text('Code')),
-              if (isLargeScreen) const DataColumn(label: Text('QR Code')),
-              const DataColumn(label: Text('Statuss')),
-              const DataColumn(label: Text('Darbības')),
-            ],
-            rows: _filteredItems.map((item) {
-              return DataRow(
-                cells: [
-                  DataCell(Text(item['code'] ?? 'Nav')),
-                  if (isLargeScreen) DataCell(Text(item['qr_code'] ?? 'Nav')),
-                  DataCell(Text(getStatusName(int.tryParse(item['status_id'].toString()) ?? 0))),
-                  DataCell(Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.edit),
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (BuildContext context) {
-                              return ItemFormDialog(
-                                item: item,
-                                onSubmit: (updatedItem) {
-                                  setState(() {
-                                    int index = _items.indexWhere((i) => i['id'] == updatedItem['id']);
-                                    if (index != -1) {
-                                      _items[index] = updatedItem;
-                                      _filterItems();
-                                    }
-                                  });
-                                  fetchItems();
-                                },
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  )),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
+        child: isLoading
+            ? Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: DataTable(
+                  columns: [
+                    const DataColumn(label: Text('Kods')),
+                    if (!_filterStatusLostItems) const DataColumn(label: Text('Lietotājs')),
+                    if (isLargeScreen) const DataColumn(label: Text('Statuss')),
+                    const DataColumn(label: Text('Darbības')),
+                  ],
+                  rows: _filteredItems.map((item) {
+                    return DataRow(
+                      cells: [
+                        DataCell(Text(item['code'] ?? 'Nav')),
+                        if (!_filterStatusLostItems) DataCell(Text(item['name'] ?? '')),
+                        if (isLargeScreen) DataCell(Text(getStatusName(int.tryParse(item['status_id'].toString())))),
+                        DataCell(Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit),
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return ItemFormDialog(
+                                      item: item,
+                                      onSubmit: (updatedItem) {
+                                        setState(() {
+                                          int index = _items.indexWhere((i) => i['id'] == updatedItem['id']);
+                                          if (index != -1) {
+                                            _items[index] = updatedItem;
+                                            _filterItems();
+                                          }
+                                        });
+                                        fetchItems();
+                                      },
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ],
+                        )),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
       ),
     );
   }
 }
+
+

@@ -104,8 +104,8 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
             labelColor: Colors.blue,
             unselectedLabelColor: Colors.grey,
             tabs: [
-              const Tab(text: 'Lietošanā'),
-              const Tab(text: 'Rezervāčija'),
+              const Tab(text: 'Priekšmeti'),
+              const Tab(text: 'Rezervēšana'),
               if (widget.isAdmin) const Tab(text: 'Noliktava'), // Jauna sadaļa
               if (widget.isAdmin) const Tab(text: 'Lietotāji'),
             ],
