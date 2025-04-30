@@ -56,3 +56,4 @@ windows/flutter/generated_plugins.cmake
 #config
 .env
 /devops/php/config.php
+/devops/php/common.php
