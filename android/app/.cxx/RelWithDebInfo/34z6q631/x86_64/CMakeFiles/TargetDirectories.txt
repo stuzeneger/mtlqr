@@ -1,0 +1,2 @@
+C:/Users/Asus/Documents/Develop/MTLBarcodes/mtlqr_app/android/app/.cxx/RelWithDebInfo/34z6q631/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/Asus/Documents/Develop/MTLBarcodes/mtlqr_app/android/app/.cxx/RelWithDebInfo/34z6q631/x86_64/CMakeFiles/rebuild_cache.dir
