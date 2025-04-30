@@ -121,14 +121,14 @@ class QRScannerScreenState extends State<QRScannerScreen> {
       SnackBar(content: Text(message)),
     );
     Navigator.pop(context);
-    //widget.onReloadTabs();
-
   }
 
   Future<void> _sendDataToServer(String qrCode) async {
     switch (widget.scanType) {
       case Scan.returning:
-        returnItem(widget.itemUID ?? '', userUID);
+        if (qrCode == AppConfig.baseRTHCode) {
+          returnItem(widget.itemUID ?? '', userUID);
+        }
       default:
         try {
           final response = await http.post(
@@ -384,11 +384,11 @@ class QRScannerScreenState extends State<QRScannerScreen> {
     if (barcodes.isNotEmpty && qrText != barcodes.first.rawValue) {
       setState(() {
         qrText = barcodes.first.rawValue ?? "Nevar nolasīt QR kodu";
-      });
-      if ((qrText.length == 6 && int.tryParse(qrText) != null) ||
+              if ((qrText.length == 6 && int.tryParse(qrText) != null) ||
           (qrText == AppConfig.baseRTHCode)) {
         _sendDataToServer(qrText);
       }
+      });       
     }
   }
 
