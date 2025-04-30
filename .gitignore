@@ -57,3 +57,5 @@ windows/flutter/generated_plugins.cmake
 .env
 /devops/php/config.php
 /devops/php/common.php
+/devops/php/mtlqr/mtlqr.apk
+/devops/php/mtlqr/mtlqr.ipa
